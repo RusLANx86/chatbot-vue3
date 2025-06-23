@@ -13,7 +13,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useChatStore } from './stores/chat'
 import ChatHeader from './components/ChatHeader.vue'
 import UserSelector from './components/UserSelector.vue'
@@ -24,6 +24,10 @@ const chatStore = useChatStore()
 
 onMounted(() => {
   chatStore.loadFromLocalStorage()
+})
+
+onUnmounted(() => {
+  chatStore.disconnect()
 })
 </script>
 

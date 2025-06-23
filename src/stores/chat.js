@@ -2,23 +2,11 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const useChatStore = defineStore('chat', () => {
-  // Состояние
   const messages = ref([])
   const currentUser = ref('User A')
-  const botResponses = [
-    'Интересно! Расскажи подробнее.',
-    'Понятно, что ты имеешь в виду.',
-    'Это очень интересная мысль!',
-    'Согласен с тобой.',
-    'Хм, нужно подумать об этом.',
-    'Отличная идея!',
-    'Спасибо за информацию.',
-    'Это заставляет задуматься.',
-    'Очень хорошо сказано!',
-    'Продолжай, мне интересно.'
-  ]
+  const typingUsers = ref(new Set())
+  const channel = new BroadcastChannel('vue3-chat')
 
-  // Геттеры
   const sortedMessages = computed(() => {
     return [...messages.value].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
   })
@@ -31,36 +19,52 @@ export const useChatStore = defineStore('chat', () => {
     return messages.value.filter(msg => msg.sender === 'User B')
   })
 
-  // Действия
+  channel.onmessage = (event) => {
+    const data = event.data
+    if (data.type === 'new_message') {
+      // Не дублируем сообщение, если оно уже есть
+      if (!messages.value.some(m => m.id === data.message.id)) {
+        messages.value.push(data.message)
+        saveToLocalStorage()
+      }
+    } else if (data.type === 'user_typing') {
+      if (data.user !== currentUser.value) {
+        if (data.isTyping) {
+          typingUsers.value.add(data.user)
+        } else {
+          typingUsers.value.delete(data.user)
+        }
+      }
+    } else if (data.type === 'clear_chat') {
+      messages.value = []
+      saveToLocalStorage()
+    }
+  }
+
   const addMessage = (text) => {
     if (!text.trim()) return
-
     const message = {
-      id: Date.now(),
+      id: Date.now() + Math.random(),
       sender: currentUser.value,
       text: text.trim(),
       timestamp: new Date().toISOString()
     }
-
     messages.value.push(message)
     saveToLocalStorage()
-
-    // Имитация ответа бота через 1-2 секунды
-    setTimeout(() => {
-      const botResponse = {
-        id: Date.now() + 1,
-        sender: currentUser.value === 'User A' ? 'User B' : 'User A',
-        text: botResponses[Math.floor(Math.random() * botResponses.length)],
-        timestamp: new Date().toISOString()
-      }
-      messages.value.push(botResponse)
-      saveToLocalStorage()
-    }, 1000 + Math.random() * 1000)
+    channel.postMessage({ type: 'new_message', message })
   }
 
   const setCurrentUser = (user) => {
     currentUser.value = user
     saveToLocalStorage()
+  }
+
+  const sendTypingStatus = (isTyping) => {
+    channel.postMessage({
+      type: 'user_typing',
+      user: currentUser.value,
+      isTyping
+    })
   }
 
   const saveToLocalStorage = () => {
@@ -71,11 +75,9 @@ export const useChatStore = defineStore('chat', () => {
   const loadFromLocalStorage = () => {
     const savedMessages = localStorage.getItem('chat-messages')
     const savedUser = localStorage.getItem('chat-current-user')
-    
     if (savedMessages) {
       messages.value = JSON.parse(savedMessages)
     }
-    
     if (savedUser) {
       currentUser.value = savedUser
     }
@@ -83,7 +85,8 @@ export const useChatStore = defineStore('chat', () => {
 
   const clearChat = () => {
     messages.value = []
-    localStorage.removeItem('chat-messages')
+    saveToLocalStorage()
+    channel.postMessage({ type: 'clear_chat' })
   }
 
   return {
@@ -92,8 +95,10 @@ export const useChatStore = defineStore('chat', () => {
     sortedMessages,
     userAMessages,
     userBMessages,
+    typingUsers,
     addMessage,
     setCurrentUser,
+    sendTypingStatus,
     loadFromLocalStorage,
     clearChat
   }

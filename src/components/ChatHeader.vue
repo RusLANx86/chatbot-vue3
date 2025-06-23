@@ -18,7 +18,6 @@
           </p>
         </div>
       </div>
-      
       <div class="flex items-center gap-2">
         <div class="text-sm text-gray-500">
           Сообщений: {{ messageCount }}
