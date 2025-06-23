@@ -6,7 +6,6 @@ from typing import Optional
 
 Base = declarative_base()
 
-# SQLAlchemy модель
 class Message(Base):
     __tablename__ = "messages"
     
@@ -15,7 +14,6 @@ class Message(Base):
     text = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
 
-# Pydantic модели для API
 class MessageBase(BaseModel):
     sender: str
     text: str
