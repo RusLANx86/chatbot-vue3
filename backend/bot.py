@@ -1,8 +1,17 @@
 import random
 import re
+import os
+import aiohttp
+import asyncio
+from typing import Optional
 
 class ChatBot:
     def __init__(self):
+        self.ollama_url = os.getenv('OLLAMA_URL', 'http://localhost:11434')
+        self.model_name = os.getenv('OLLAMA_MODEL', 'llama2:7b')
+        self.use_llm = os.getenv('USE_LLM', 'true').lower() == 'true'
+        
+        # Fallback ответы для случаев, когда LLM недоступен
         self.responses = {
             "привет": [
                 "Привет! Как дела?",
@@ -65,8 +74,46 @@ class ChatBot:
             "Что тебя вдохновляет?"
         ]
 
-    def get_response(self, message: str) -> str:
-        """Получить ответ бота на сообщение"""
+    async def get_llm_response(self, message: str) -> Optional[str]:
+        """Получить ответ от Ollama LLM"""
+        if not self.use_llm:
+            return None
+            
+        try:
+            async with aiohttp.ClientSession() as session:
+                payload = {
+                    "model": self.model_name,
+                    "prompt": f"""Ты дружелюбный чат-бот. Отвечай кратко и по-русски на сообщение пользователя.
+
+Сообщение пользователя: {message}
+
+Ответ:""",
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.7,
+                        "top_p": 0.9,
+                        "max_tokens": 150
+                    }
+                }
+                
+                async with session.post(
+                    f"{self.ollama_url}/api/generate",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data.get('response', '').strip()
+                    else:
+                        print(f"Ollama API error: {response.status}")
+                        return None
+                        
+        except Exception as e:
+            print(f"Error calling Ollama API: {e}")
+            return None
+
+    def get_fallback_response(self, message: str) -> str:
+        """Получить fallback ответ"""
         message_lower = message.lower().strip()
         
         for keyword, responses in self.responses.items():
@@ -92,3 +139,16 @@ class ChatBot:
             return "Вау! Ты очень подробно все объяснил! Спасибо за информацию!"
         
         return random.choice(self.general_responses)
+
+    async def get_response(self, message: str) -> str:
+        """Получить ответ бота (LLM или fallback)"""
+        llm_response = await self.get_llm_response(message)
+        
+        if llm_response and len(llm_response) > 0:
+            return llm_response
+        else:
+            return self.get_fallback_response(message)
+
+    def get_response_sync(self, message: str) -> str:
+        """Синхронная версия для совместимости"""
+        return asyncio.run(self.get_response(message))

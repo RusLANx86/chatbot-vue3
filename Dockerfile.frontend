@@ -1,0 +1,26 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Копируем файлы зависимостей
+COPY package*.json ./
+
+# Устанавливаем зависимости
+RUN npm install
+
+# Копируем исходный код
+COPY . .
+
+# Создаем пользователя для безопасности
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S vuejs -u 1001
+
+# Меняем владельца файлов
+RUN chown -R vuejs:nodejs /app
+USER vuejs
+
+# Открываем порт
+EXPOSE 3000
+
+# Команда запуска
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"] 

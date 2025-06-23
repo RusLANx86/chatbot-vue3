@@ -11,6 +11,7 @@ export const useChatStore = defineStore('chat', () => {
   const isLoading = ref(false)
   const error = ref(null)
   const isConnected = ref(false)
+  const llmStatus = ref('unknown') // 'unknown', 'loading', 'ready', 'error'
   
   let ws = null
 
@@ -31,6 +32,8 @@ export const useChatStore = defineStore('chat', () => {
     return messages.value.filter(msg => msg.sender === 'Bot')
   })
 
+  const userMessages = computed(() => messages.value.filter(m => m.sender !== 'Bot'))
+
   // WebSocket соединение
   const connectWebSocket = () => {
     if (ws) {
@@ -43,6 +46,7 @@ export const useChatStore = defineStore('chat', () => {
       console.log('WebSocket соединение установлено')
       isConnected.value = true
       error.value = null
+      checkLLMStatus()
     }
 
     ws.onmessage = (event) => {
@@ -56,6 +60,8 @@ export const useChatStore = defineStore('chat', () => {
           }
         } else if (data.type === 'clear_messages') {
           messages.value = []
+        } else if (data.type === 'llm_status') {
+          llmStatus.value = data.status
         }
       } catch (err) {
         console.error('Ошибка обработки WebSocket сообщения:', err)
@@ -185,6 +191,19 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // Проверка статуса LLM
+  const checkLLMStatus = async () => {
+    try {
+      llmStatus.value = 'loading'
+      const response = await fetch(`${API_BASE_URL}/bot/status`)
+      const data = await response.json()
+      llmStatus.value = data.status
+    } catch (error) {
+      console.error('Ошибка проверки статуса LLM:', error)
+      llmStatus.value = 'error'
+    }
+  }
+
   return {
     messages,
     currentUser,
@@ -192,14 +211,17 @@ export const useChatStore = defineStore('chat', () => {
     userAMessages,
     userBMessages,
     botMessages,
+    userMessages,
     isLoading,
     error,
     isConnected,
+    llmStatus,
     sendMessage,
     setCurrentUser,
     fetchMessages,
     clearMessages,
     loadFromLocalStorage,
-    disconnect
+    disconnect,
+    checkLLMStatus
   }
 }) 

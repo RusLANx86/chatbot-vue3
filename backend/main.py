@@ -6,6 +6,8 @@ import random
 import asyncio
 import json
 from datetime import datetime
+import aiohttp
+import os
 
 from database import get_db, init_db
 from models import Message, MessageCreate, MessageResponse
@@ -96,7 +98,7 @@ async def send_bot_response_ws(db: Session, user_message: str):
     """Асинхронно отправляет ответ бота через WebSocket"""
     await asyncio.sleep(random.uniform(1, 3))  # Задержка 1-3 секунды
     
-    bot_response = chat_bot.get_response(user_message)
+    bot_response = await chat_bot.get_response(user_message)
     
     db_message = Message(
         sender="Bot",
@@ -156,7 +158,7 @@ async def create_message(message: MessageCreate, db: Session = Depends(get_db)):
 @app.post("/bot/respond")
 async def bot_respond(message: MessageCreate, db: Session = Depends(get_db)):
     """Получить ответ от бота"""
-    bot_response = chat_bot.get_response(message.text)
+    bot_response = await chat_bot.get_response(message.text)
     
     db_message = Message(
         sender="Bot",
@@ -173,7 +175,7 @@ async def send_bot_response(db: Session, user_message: str):
     """Асинхронно отправляет ответ бота"""
     await asyncio.sleep(random.uniform(1, 3))  # Задержка 1-3 секунды
     
-    bot_response = chat_bot.get_response(user_message)
+    bot_response = await chat_bot.get_response(user_message)
     
     db_message = Message(
         sender="Bot",
@@ -207,6 +209,46 @@ async def clear_messages(db: Session = Depends(get_db)):
     }))
     
     return {"message": "All messages cleared"}
+
+@app.get("/bot/status")
+async def bot_status():
+    """Получить статус LLM"""
+    try:
+        # Проверяем доступность Ollama
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{os.getenv('OLLAMA_URL', 'http://localhost:11434')}/api/tags") as response:
+                if response.status == 200:
+                    data = await response.json()
+                    model_name = os.getenv('OLLAMA_MODEL', 'llama2:7b')
+                    models = [model['name'] for model in data.get('models', [])]
+                    
+                    if model_name in models:
+                        # Тестируем модель
+                        test_payload = {
+                            "model": model_name,
+                            "prompt": "test",
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.7,
+                                "max_tokens": 10
+                            }
+                        }
+                        
+                        async with session.post(
+                            f"{os.getenv('OLLAMA_URL', 'http://localhost:11434')}/api/generate",
+                            json=test_payload,
+                            timeout=aiohttp.ClientTimeout(total=5)
+                        ) as test_response:
+                            if test_response.status == 200:
+                                return {"status": "ready", "model": model_name}
+                            else:
+                                return {"status": "loading", "model": model_name}
+                    else:
+                        return {"status": "error", "message": f"Модель {model_name} не найдена"}
+                else:
+                    return {"status": "error", "message": "Ollama недоступна"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

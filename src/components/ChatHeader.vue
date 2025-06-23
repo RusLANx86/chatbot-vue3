@@ -33,6 +33,25 @@
           </span>
         </div>
         
+        <!-- Статус LLM -->
+        <div class="flex items-center gap-2">
+          <div 
+            :class="[
+              'w-3 h-3 rounded-full',
+              llmStatus === 'ready' ? 'bg-green-500 animate-pulse' : 
+              llmStatus === 'loading' ? 'bg-yellow-500 animate-spin' : 
+              'bg-red-500'
+            ]"
+          ></div>
+          <span class="text-sm text-gray-500">
+            {{ 
+              llmStatus === 'ready' ? '🤖 LLM готов' : 
+              llmStatus === 'loading' ? '🤖 LLM загружается...' : 
+              '🤖 LLM недоступен' 
+            }}
+          </span>
+        </div>
+        
         <!-- Статистика -->
         <div class="text-sm text-gray-500">
           <div>Сообщений: {{ messageCount }}</div>
@@ -70,6 +89,7 @@ const messageCount = computed(() => chatStore.messages.length)
 const botMessageCount = computed(() => chatStore.botMessages.length)
 const isLoading = computed(() => chatStore.isLoading)
 const isConnected = computed(() => chatStore.isConnected)
+const llmStatus = computed(() => chatStore.llmStatus)
 
 const clearChat = async () => {
   if (confirm('Вы уверены, что хотите очистить весь чат?')) {
