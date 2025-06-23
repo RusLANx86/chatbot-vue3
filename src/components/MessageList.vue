@@ -18,17 +18,24 @@
           'max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow-sm',
           message.sender === currentUser
             ? 'bg-blue-500 text-white'
+            : message.sender === 'Bot'
+            ? 'bg-purple-500 text-white'
             : 'bg-gray-100 text-gray-800'
         ]"
       >
         <div class="flex items-center justify-between mb-1">
           <span class="font-medium text-sm">
             {{ message.sender }}
+            <span v-if="message.sender === 'Bot'" class="text-xs">🤖</span>
           </span>
           <span 
             :class="[
               'text-xs',
-              message.sender === currentUser ? 'text-blue-100' : 'text-gray-500'
+              message.sender === currentUser 
+                ? 'text-blue-100' 
+                : message.sender === 'Bot'
+                ? 'text-purple-100'
+                : 'text-gray-500'
             ]"
           >
             {{ formatTime(message.timestamp) }}

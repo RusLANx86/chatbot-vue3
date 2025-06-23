@@ -6,85 +6,54 @@
         type="text"
         placeholder="Введите сообщение..."
         class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        @input="handleTyping"
-        @focus="handleTyping"
-        @blur="stopTyping"
+        :disabled="isLoading"
       />
       <button
         type="submit"
-        :disabled="!messageText.trim()"
+        :disabled="!messageText.trim() || isLoading"
         :class="[
           'px-6 py-2 rounded-lg font-medium transition-all duration-200',
-          messageText.trim()
+          messageText.trim() && !isLoading
             ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md'
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
         ]"
       >
-        📤
+        <span v-if="!isLoading">📤</span>
+        <span v-else class="animate-spin">⏳</span>
       </button>
     </form>
     
-    <!-- Индикатор печати других пользователей -->
-    <div v-if="otherUsersTyping.length > 0" class="mt-2 text-sm text-gray-500 flex items-center gap-2">
+    <!-- Индикатор загрузки -->
+    <div v-if="isLoading" class="mt-2 text-sm text-gray-500 flex items-center gap-2">
       <div class="flex space-x-1">
-        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-        <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+        <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+        <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+        <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
       </div>
-      <span>{{ otherUsersTyping.join(', ') }} печатает...</span>
+      <span>Отправка сообщения...</span>
+    </div>
+
+    <!-- Ошибка -->
+    <div v-if="error" class="mt-2 text-sm text-red-500">
+      Ошибка: {{ error }}
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useChatStore } from '../stores/chat'
 
 const chatStore = useChatStore()
 const messageText = ref('')
-const isTyping = ref(false)
-let typingTimeout = null
 
-const currentUser = computed(() => chatStore.currentUser)
-const typingUsers = computed(() => chatStore.typingUsers)
+const isLoading = computed(() => chatStore.isLoading)
+const error = computed(() => chatStore.error)
 
-// Пользователи, которые печатают (кроме текущего)
-const otherUsersTyping = computed(() => {
-  return Array.from(typingUsers.value).filter(user => user !== currentUser.value)
-})
-
-const handleTyping = () => {
-  if (!isTyping.value) {
-    isTyping.value = true
-    chatStore.sendTypingStatus(true)
-  }
-  if (typingTimeout) {
-    clearTimeout(typingTimeout)
-  }
-  typingTimeout = setTimeout(() => {
-    stopTyping()
-  }, 2000)
-}
-
-const stopTyping = () => {
-  if (isTyping.value) {
-    isTyping.value = false
-    chatStore.sendTypingStatus(false)
-  }
-  if (typingTimeout) {
-    clearTimeout(typingTimeout)
-    typingTimeout = null
-  }
-}
-
-const sendMessage = () => {
-  if (!messageText.value.trim()) return
-  chatStore.addMessage(messageText.value)
+const sendMessage = async () => {
+  if (!messageText.value.trim() || isLoading.value) return
+  
+  await chatStore.sendMessage(messageText.value)
   messageText.value = ''
-  stopTyping()
 }
-
-onUnmounted(() => {
-  stopTyping()
-})
 </script> 
